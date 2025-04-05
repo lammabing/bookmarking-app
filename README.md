@@ -22,8 +22,11 @@ A web-based application for managing bookmarks with features for adding, organiz
    ```bash
    npm install
    ```
-
-3. Start the development server:
+3. Configure docker mongodb instance. Edit docker-compose.yml. Then run:
+   ```bash
+   docker compose up -d
+   ```
+4. Start the development server:
    ```bash
    npm start
    ```
