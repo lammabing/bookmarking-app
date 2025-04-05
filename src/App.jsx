@@ -6,7 +6,7 @@ import FontSettingsModal from './components/FontSettingsModal';
 import { loadFontSettings, saveFontSettings } from './utils/fontSettings';
 import { Settings, Grid, List, Copy, Upload, Bookmark as BookmarkIcon } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api/bookmarks';
+const API_URL = 'http://localhost:5015/api/bookmarks';
 
 const App = () =>
 {

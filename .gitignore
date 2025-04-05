@@ -8,6 +8,9 @@ pids
 *.pid
 *.seed
 
+#mongodb connection tests
+mongodb-utils/
+
 # Directory for compiled output
 dist
 build
