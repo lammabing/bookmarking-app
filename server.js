@@ -1,10 +1,10 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
-// Initialize Express app
+dotenv.config();
+
 const app = express();
 const PORT = 5015;
 
@@ -13,104 +13,140 @@ app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect('mongodb://localhost:27017/bookmarking-app', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    console.log('Connected to MongoDB');
+}).catch((error) => {
+    console.error('MongoDB connection error:', error);
 });
 
-const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'MongoDB connection error:'));
-db.once('open', () =>
-{
-  console.log('Connected to MongoDB');
-});
-
-// Define Bookmark Schema
+// Bookmark Schema
 const bookmarkSchema = new mongoose.Schema({
-  url: String,
-  title: String,
-  description: String,
-  tags: [String],
-  favicon: String,
+    url: { type: String, required: true },
+    title: { type: String, required: true },
+    description: { type: String },
+    tags: [String],
+    favicon: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Update the updatedAt timestamp before saving
+bookmarkSchema.pre('save', function(next) {
+    this.updatedAt = new Date();
+    next();
 });
 
 const Bookmark = mongoose.model('Bookmark', bookmarkSchema);
 
-// API Endpoints
-app.get('/api/bookmarks', async (req, res) =>
-{
-  try {
-    const bookmarks = await Bookmark.find();
-    res.json(bookmarks);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// API Routes
+
+// GET all bookmarks
+app.get('/api/bookmarks', async (req, res) => {
+    try {
+        const bookmarks = await Bookmark.find().sort({ createdAt: -1 });
+        res.json(bookmarks);
+    } catch (err) {
+        console.error('Error fetching bookmarks:', err);
+        res.status(500).json({ message: err.message });
+    }
 });
 
-// Bookmarklet endpoint
-app.get('/add', async (req, res) =>
-{
-  const { url, title, description, favicon } = req.query;
-
-  if (!url) {
-    return res.status(400).json({ message: 'URL is required' });
-  }
-
-  // Redirect to the app's form page with pre-filled data
-  const redirectUrl = `http://localhost:5170/add-bookmark?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title || 'Untitled')}&description=${encodeURIComponent(description || '')}&favicon=${encodeURIComponent(favicon || `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`)}`;
-  res.redirect(redirectUrl);
+// GET single bookmark
+app.get('/api/bookmarks/:id', async (req, res) => {
+    try {
+        const bookmark = await Bookmark.findById(req.params.id);
+        if (!bookmark) {
+            return res.status(404).json({ message: 'Bookmark not found' });
+        }
+        res.json(bookmark);
+    } catch (err) {
+        console.error('Error fetching bookmark:', err);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ message: 'Invalid Bookmark ID format' });
+        }
+        res.status(500).json({ message: err.message });
+    }
 });
 
-app.post('/api/bookmarks', async (req, res) =>
-{
-  const bookmark = new Bookmark(req.body);
-  try {
-    const savedBookmark = await bookmark.save();
-    res.status(201).json(savedBookmark);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
+// POST new bookmark(s)
+app.post('/api/bookmarks', async (req, res) => {
+    try {
+        // Handle both single bookmark and array of bookmarks
+        const data = Array.isArray(req.body) ? req.body : [req.body];
+        const savedBookmarks = await Promise.all(
+            data.map(async (bookmarkData) => {
+                const bookmark = new Bookmark(bookmarkData);
+                return await bookmark.save();
+            })
+        );
+        
+        // Return appropriate response based on input
+        res.status(201).json(Array.isArray(req.body) ? savedBookmarks : savedBookmarks[0]);
+    } catch (err) {
+        console.error('Error creating bookmark:', err);
+        res.status(400).json({ message: err.message });
+    }
 });
 
-app.delete('/api/bookmarks/:id', async (req, res) =>
-{
-  try {
-    await Bookmark.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Bookmark deleted' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// PUT update bookmark
+app.put('/api/bookmarks/:id', async (req, res) => {
+    try {
+        const bookmarkId = req.params.id;
+        const updateData = {
+            ...req.body,
+            updatedAt: new Date()
+        };
+        
+        const updatedBookmark = await Bookmark.findByIdAndUpdate(
+            bookmarkId,
+            updateData,
+            { 
+                new: true, // Return the updated document
+                runValidators: true // Run model validators
+            }
+        );
+
+        if (!updatedBookmark) {
+            return res.status(404).json({ message: 'Bookmark not found' });
+        }
+
+        res.json(updatedBookmark);
+    } catch (err) {
+        console.error('Error updating bookmark:', err);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ message: 'Invalid Bookmark ID format' });
+        }
+        res.status(500).json({ message: err.message });
+    }
 });
 
-app.put('/api/bookmarks/:id', async (req, res) =>
-{
-  try {
-    const updatedBookmark = await Bookmark.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true }
-    );
-    res.json(updatedBookmark);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// DELETE bookmark
+app.delete('/api/bookmarks/:id', async (req, res) => {
+    try {
+        const bookmark = await Bookmark.findByIdAndDelete(req.params.id);
+        if (!bookmark) {
+            return res.status(404).json({ message: 'Bookmark not found' });
+        }
+        res.json({ message: 'Bookmark deleted successfully' });
+    } catch (err) {
+        console.error('Error deleting bookmark:', err);
+        if (err.kind === 'ObjectId') {
+            return res.status(400).json({ message: 'Invalid Bookmark ID format' });
+        }
+        res.status(500).json({ message: err.message });
+    }
 });
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  app.use(express.static(path.join(__dirname, 'dist')));
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something went wrong!' });
+});
 
-  // Handle all other routes by serving the frontend's index.html
-  app.get('*', (req, res) =>
-  {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-  });
-}
-
-// Start Server
-app.listen(PORT, () =>
-{
-  console.log(`Server running on http://localhost:${PORT}`);
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });

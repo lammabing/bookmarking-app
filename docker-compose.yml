@@ -8,4 +8,5 @@ services:
     ports:
       - 27017:27017
     volumes:
-      - local/path/to/volume/dir/:/data/db/
+      - /home/ceo/docker-mongodb/:/data/db/
+    

@@ -8,8 +8,7 @@ import { Settings, Grid, List, Copy, Upload, Bookmark as BookmarkIcon } from 'lu
 
 const API_URL = 'http://localhost:5015/api/bookmarks';
 
-const App = () =>
-{
+const App = () => {
   const [bookmarks, setBookmarks] = useState([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
@@ -28,8 +27,7 @@ const App = () =>
   const [hoverText, setHoverText] = useState('');
 
   // Load font settings on mount
-  useEffect(() =>
-  {
+  useEffect(() => {
     const savedSettings = loadFontSettings();
     if (savedSettings) {
       setFontSettings(savedSettings);
@@ -37,16 +35,13 @@ const App = () =>
   }, []);
 
   // Save font settings when they change
-  useEffect(() =>
-  {
+  useEffect(() => {
     saveFontSettings(fontSettings);
   }, [fontSettings]);
 
   // Fetch bookmarks from the backend
-  useEffect(() =>
-  {
-    const fetchBookmarks = async () =>
-    {
+  useEffect(() => {
+    const fetchBookmarks = async () => {
       try {
         const response = await fetch(API_URL);
         const data = await response.json();
@@ -60,8 +55,7 @@ const App = () =>
   }, []);
 
   // Handle bookmarklet data
-  useEffect(() =>
-  {
+  useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
     const url = queryParams.get('url');
     const title = queryParams.get('title');
@@ -82,8 +76,7 @@ const App = () =>
   }, []);
 
   // Add a new bookmark
-  const handleAddBookmark = async (bookmark) =>
-  {
+  const handleAddBookmark = async (bookmark) => {
     try {
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -102,9 +95,10 @@ const App = () =>
   };
 
   // Edit a bookmark
-  const handleEditBookmark = async (updatedBookmark) =>
-  {
+  const handleEditBookmark = async (updatedBookmark) => {
+    console.log('handleEditBookmark called with:', updatedBookmark);
     try {
+      console.log(`Attempting PUT request to ${API_URL}/${updatedBookmark._id}`);
       const response = await fetch(`${API_URL}/${updatedBookmark._id}`, {
         method: 'PUT',
         headers: {
@@ -112,7 +106,14 @@ const App = () =>
         },
         body: JSON.stringify(updatedBookmark),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const savedBookmark = await response.json();
+      console.log('PUT request successful, received:', savedBookmark);
+      
       const updatedBookmarks = bookmarks.map((bookmark) =>
         bookmark._id === savedBookmark._id ? savedBookmark : bookmark
       );
@@ -120,12 +121,12 @@ const App = () =>
       setFilteredBookmarks(updatedBookmarks);
     } catch (error) {
       console.error('Error updating bookmark:', error);
+      alert('Failed to update bookmark. Please try again.');
     }
   };
 
   // Delete a bookmark
-  const handleDeleteBookmark = async (id) =>
-  {
+  const handleDeleteBookmark = async (id) => {
     try {
       await fetch(`${API_URL}/${id}`, {
         method: 'DELETE',
@@ -139,8 +140,7 @@ const App = () =>
   };
 
   // Search bookmarks
-  const handleSearch = (query) =>
-  {
+  const handleSearch = (query) => {
     const filtered = bookmarks.filter(
       (bookmark) =>
         bookmark.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -151,42 +151,35 @@ const App = () =>
   };
 
   // Toggle view mode
-  const toggleViewMode = () =>
-  {
+  const toggleViewMode = () => {
     setViewMode((prevMode) => (prevMode === 'grid' ? 'list' : 'grid'));
   };
 
   // Apply font settings
-  const handleApplyFontSettings = (settings) =>
-  {
+  const handleApplyFontSettings = (settings) => {
     setFontSettings(settings);
   };
 
   // Copy filtered bookmarks to clipboard as JSON
-  const handleCopyBookmarks = () =>
-  {
+  const handleCopyBookmarks = () => {
     const jsonString = JSON.stringify(filteredBookmarks, null, 2);
     navigator.clipboard.writeText(jsonString)
-      .then(() =>
-      {
+      .then(() => {
         alert('Filtered bookmarks copied to clipboard!');
       })
-      .catch((err) =>
-      {
+      .catch((err) => {
         console.error('Failed to copy bookmarks:', err);
         alert('Failed to copy bookmarks to clipboard.');
       });
   };
 
   // Import bookmarks from a JSON file
-  const handleImportBookmarks = (event) =>
-  {
+  const handleImportBookmarks = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (e) =>
-    {
+    reader.onload = async (e) => {
       try {
         const importedBookmarks = JSON.parse(e.target.result);
 
@@ -224,13 +217,13 @@ const App = () =>
   };
 
   const bookmarkletCode = `javascript:(function() {
-  const url = encodeURIComponent(window.location.href);
-  const title = encodeURIComponent(document.title);
-  const description = encodeURIComponent(window.getSelection().toString().trim() || '');
-  const favicon = encodeURIComponent(document.querySelector('link[rel*="icon"]')?.href || \`https://www.google.com/s2/favicons?domain=\${window.location.hostname}\`);
-  const appUrl = \`http://localhost:5170/add?url=\${url}&title=\${title}&description=\${description}&favicon=\${favicon}\`;
-  window.open(appUrl, '_blank');
-})();`;
+    const url = encodeURIComponent(window.location.href);
+    const title = encodeURIComponent(document.title);
+    const description = encodeURIComponent(window.getSelection().toString().trim() || '');
+    const favicon = encodeURIComponent(document.querySelector('link[rel*="icon"]')?.href || \`https://www.google.com/s2/favicons?domain=\${window.location.hostname}\`);
+    const appUrl = \`http://localhost:5170/add?url=\${url}&title=\${title}&description=\${description}&favicon=\${favicon}\`;
+    window.open(appUrl, '_blank');
+  })();`;
 
   return (
     <div className="p-2">
@@ -283,14 +276,12 @@ const App = () =>
         </label>
 
         {/* Bookmarklet Button */}
-
         <a
           href={bookmarkletCode}
           draggable="true"
           onMouseEnter={() => setHoverText('Drag to Bookmark Bar')}
           onMouseLeave={() => setHoverText('')}
           className="p-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 flex items-center justify-center w-10 h-10"
-
         >
           <BookmarkIcon size={24} />
         </a>
