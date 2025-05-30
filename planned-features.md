@@ -2,11 +2,12 @@
 
 This document outlines potential features to add to the bookmarking application, aiming to improve its utility, usability, flexibility, and robustness. Each feature includes a brief description and notes on practicality and tradeoffs.
 
-#### 1. Enhanced Tag Management
+#### 1. Enhanced Tag Management [COMPLETED]
 
 *   **Description:** Provide a dedicated interface to view all existing tags, see how many bookmarks are associated with each tag, and allow users to rename or delete tags globally.
 *   **Practicality:** Relatively practical to implement. Requires backend endpoints for tag management and a frontend UI component.
 *   **Tradeoffs:** Need to handle orphaned bookmarks if a tag is deleted. Renaming a tag affects all associated bookmarks.
+*   **Status:** Completed. Backend APIs and frontend UI implemented.
 
 #### 2. Folder/Collection System
 
