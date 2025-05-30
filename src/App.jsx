@@ -110,7 +110,18 @@ const App = () => {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          // Try to get a more specific message from the server response
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          // If parsing JSON fails, stick with the original HTTP error
+          console.warn('Could not parse error response as JSON:', e);
+        }
+        throw new Error(errorMessage);
       }
 
       const savedBookmark = await response.json();
@@ -122,8 +133,8 @@ const App = () => {
       setBookmarks(updatedBookmarks);
       setFilteredBookmarks(updatedBookmarks);
     } catch (error) {
-      console.error('Error updating bookmark:', error);
-      alert('Failed to update bookmark. Please try again.');
+      console.error('Error updating bookmark:', error.message);
+      alert(`Failed to update bookmark: ${error.message}`);
     }
   };
 
