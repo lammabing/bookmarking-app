@@ -278,6 +278,7 @@ const App = () => {
         {/* Bookmarklet Button */}
         <a
           href={bookmarkletCode}
+          title="🔖"
           draggable="true"
           onMouseEnter={() => setHoverText('Drag to Bookmark Bar')}
           onMouseLeave={() => setHoverText('')}
