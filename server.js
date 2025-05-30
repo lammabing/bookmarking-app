@@ -140,6 +140,90 @@ app.delete('/api/bookmarks/:id', async (req, res) => {
     }
 });
 
+// TAG MANAGEMENT ROUTES
+
+// GET all unique tags and their counts
+app.get('/api/tags', async (req, res) => {
+    try {
+        const tags = await Bookmark.aggregate([
+            { $unwind: '$tags' },
+            { $group: { _id: '$tags', count: { $sum: 1 } } },
+            { $sort: { _id: 1 } },
+            { $project: { name: '$_id', count: 1, _id: 0 } }
+        ]);
+        res.json(tags);
+    } catch (err) {
+        console.error('Error fetching tags:', err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+// PUT rename a tag
+app.put('/api/tags/:oldName', async (req, res) => {
+    const { oldName } = req.params;
+    const { newName } = req.body;
+
+    if (!newName || newName.trim() === '') {
+        return res.status(400).json({ message: 'New tag name is required and cannot be empty.' });
+    }
+    if (oldName === newName) {
+        return res.status(400).json({ message: 'Old and new tag names cannot be the same.' });
+    }
+
+    try {
+        const bookmarksToUpdate = await Bookmark.find({ tags: oldName });
+        let updatedCount = 0;
+
+        if (bookmarksToUpdate.length === 0) {
+            return res.json({ message: `Tag '${oldName}' not found on any bookmarks. No changes made.` });
+        }
+
+        for (const bookmark of bookmarksToUpdate) {
+            const oldTagIndex = bookmark.tags.indexOf(oldName);
+            if (oldTagIndex > -1) {
+                bookmark.tags.splice(oldTagIndex, 1); // Remove old tag
+            }
+            if (!bookmark.tags.includes(newName)) { // Add new tag if not already present
+                bookmark.tags.push(newName);
+            }
+            bookmark.updatedAt = new Date();
+            await bookmark.save();
+            updatedCount++;
+        }
+        
+        res.json({ message: `Tag '${oldName}' successfully renamed to '${newName}' on ${updatedCount} bookmarks.` });
+
+    } catch (err) {
+        console.error(`Error renaming tag '${oldName}' to '${newName}':`, err);
+        res.status(500).json({ message: `Error renaming tag: ${err.message}` });
+    }
+});
+
+// DELETE a tag from all bookmarks
+app.delete('/api/tags/:tagName', async (req, res) => {
+    const { tagName } = req.params;
+    try {
+        const result = await Bookmark.updateMany(
+            { tags: tagName },
+            {
+                $pull: { tags: tagName },
+                $set: { updatedAt: new Date() }
+            }
+        );
+        
+        if (result.modifiedCount === 0) {
+            // This means the tag was not found on any bookmarks, which is not an error.
+            // The desired state (tag is not present) is achieved or was already true.
+            return res.json({ message: `Tag '${tagName}' not found on any bookmarks or already removed. No changes made.` });
+        }
+        
+        res.json({ message: `Tag '${tagName}' successfully removed from ${result.modifiedCount} bookmarks.` });
+    } catch (err) {
+        console.error(`Error deleting tag '${tagName}':`, err);
+        res.status(500).json({ message: `Error deleting tag: ${err.message}` });
+    }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);

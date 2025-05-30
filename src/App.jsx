@@ -3,8 +3,9 @@ import BookmarkGrid from './components/BookmarkGrid';
 import SearchBar from './components/SearchBar';
 import AddBookmarkForm from './components/AddBookmarkForm';
 import FontSettingsModal from './components/FontSettingsModal';
+import TagManager from './components/TagManager'; // Import TagManager
 import { loadFontSettings, saveFontSettings } from './utils/fontSettings';
-import { Settings, Grid, List, Copy, Upload, Bookmark as BookmarkIcon } from 'lucide-react';
+import { Settings, Grid, List, Copy, Upload, Bookmark as BookmarkIcon, Tags } from 'lucide-react'; // Import Tags icon
 
 const API_URL = 'http://localhost:5015/api/bookmarks';
 
@@ -24,6 +25,7 @@ const App = () => {
     descriptionFontColor: '#333333',
   });
   const [isFontSettingsModalOpen, setIsFontSettingsModalOpen] = useState(false);
+  const [isTagManagerOpen, setIsTagManagerOpen] = useState(false); // State for TagManager visibility
   const [hoverText, setHoverText] = useState('');
 
   // Load font settings on mount
@@ -287,6 +289,16 @@ const App = () => {
           <BookmarkIcon size={24} />
         </a>
 
+        {/* Tag Manager Button */}
+        <button
+          onClick={() => setIsTagManagerOpen(prev => !prev)}
+          onMouseEnter={() => setHoverText('Manage Tags')}
+          onMouseLeave={() => setHoverText('')}
+          className="p-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 flex items-center justify-center w-10 h-10"
+        >
+          <Tags size={24} />
+        </button>
+
         {/* Hover Text Box */}
         <div className="flex-1 ml-2">
           <input
@@ -305,6 +317,11 @@ const App = () => {
         onApply={handleApplyFontSettings}
         initialSettings={fontSettings}
       />
+      {isTagManagerOpen && (
+        <div className="my-4">
+          <TagManager />
+        </div>
+      )}
       <BookmarkGrid
         bookmarks={filteredBookmarks}
         onDelete={handleDeleteBookmark}
