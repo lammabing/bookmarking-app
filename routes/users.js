@@ -16,8 +16,8 @@ router.post('/register', async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res.status(400).json({ 
-        message: existingUser.email === email ? 'Email already in use' : 'Username already taken' 
+      return res.status(400).json({
+        message: existingUser.email === email ? 'Email already in use' : 'Username already taken'
       });
     }
     
@@ -41,8 +41,15 @@ router.post('/register', async (req, res) => {
       { expiresIn: '24h' }
     );
     
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    
     res.status(201).json({
-      token,
       user: {
         id: savedUser._id,
         username: savedUser.username,
@@ -81,8 +88,15 @@ router.post('/login', async (req, res) => {
       { expiresIn: '24h' }
     );
     
+    // Set cookie
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    });
+    
     res.json({
-      token,
       user: {
         id: user._id,
         username: user.username,
@@ -93,6 +107,14 @@ router.post('/login', async (req, res) => {
     console.error('Error logging in:', err);
     res.status(500).json({ message: err.message });
   }
+});
+
+// @route   POST /api/users/logout
+// @desc    Logout user
+// @access  Private
+router.post('/logout', auth, (req, res) => {
+  res.clearCookie('token');
+  res.json({ message: 'Logged out successfully' });
 });
 
 // @route   GET /api/users/me
@@ -107,6 +129,23 @@ router.get('/me', auth, async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error('Error fetching user:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// @route   GET /api/users/shareable
+// @desc    Get list of shareable users
+// @access  Private
+router.get('/shareable', auth, async (req, res) => {
+  try {
+    // Get all users except the current user
+    const users = await User.find({
+      _id: { $ne: req.user.id }
+    }).select('id username email');
+    
+    res.json(users);
+  } catch (err) {
+    console.error('Error fetching shareable users:', err);
     res.status(500).json({ message: err.message });
   }
 });

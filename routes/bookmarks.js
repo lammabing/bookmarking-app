@@ -161,15 +161,20 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// @route   POST /api/bookmarks/:id/share
-// @desc    Share a bookmark with specific users
+// @route   PUT /api/bookmarks/:id/share
+// @desc    Update bookmark sharing settings
 // @access  Private
-router.post('/:id/share', auth, async (req, res) => {
+router.put('/:id/share', auth, async (req, res) => {
   try {
-    const { userIds } = req.body;
+    const { visibility, sharedWith } = req.body;
     
-    if (!userIds || !Array.isArray(userIds)) {
-      return res.status(400).json({ message: 'User IDs array is required' });
+    // Validate request body
+    if (!visibility || !['private', 'public', 'selected'].includes(visibility)) {
+      return res.status(400).json({ message: 'Invalid visibility value' });
+    }
+    
+    if (visibility === 'selected' && (!sharedWith || !Array.isArray(sharedWith))) {
+      return res.status(400).json({ message: 'sharedWith array is required for selected visibility' });
     }
     
     const bookmark = await Bookmark.findById(req.params.id);
@@ -180,19 +185,29 @@ router.post('/:id/share', auth, async (req, res) => {
     
     // Check if user owns this bookmark
     if (bookmark.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to share this bookmark' });
+      return res.status(403).json({ message: 'Not authorized to update sharing settings' });
     }
     
-    // Update bookmark visibility and shared users
-    bookmark.visibility = 'selected';
-    bookmark.sharedWith = [...new Set([...bookmark.sharedWith, ...userIds])];
+    // Update bookmark sharing settings
+    bookmark.visibility = visibility;
+    bookmark.sharedWith = visibility === 'selected' ? [...new Set(sharedWith)] : [];
     bookmark.updatedAt = new Date();
     
     await bookmark.save();
     
-    res.json({ message: 'Bookmark shared successfully', bookmark });
+    // TODO: Implement notification sending
+    // await sendSharingNotification(bookmark);
+    
+    res.json({
+      message: 'Sharing settings updated successfully',
+      bookmark: {
+        _id: bookmark._id,
+        visibility: bookmark.visibility,
+        sharedWith: bookmark.sharedWith
+      }
+    });
   } catch (err) {
-    console.error('Error sharing bookmark:', err);
+    console.error('Error updating sharing settings:', err);
     res.status(500).json({ message: err.message });
   }
 });

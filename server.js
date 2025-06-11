@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import userRoutes from './routes/users.js';
 import bookmarkRoutes from './routes/bookmarks.js';
 
@@ -18,6 +19,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/users', userRoutes);
@@ -40,5 +42,3 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({ message: 'Something went wrong!' });
 });
-
-// Removed the second app.listen call

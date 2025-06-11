@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import ShareSettings from './ShareSettings';
 
 const EditBookmarkForm = ({ bookmark, onSave, onCancel }) => {
     const [url, setUrl] = useState(bookmark.url);
     const [title, setTitle] = useState(bookmark.title);
     const [description, setDescription] = useState(bookmark.description);
     const [tags, setTags] = useState(bookmark.tags.join(','));
+    const [sharingSettings, setSharingSettings] = useState({
+      visibility: bookmark.visibility || 'private',
+      sharedWith: bookmark.sharedWith || []
+    });
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -14,6 +19,7 @@ const EditBookmarkForm = ({ bookmark, onSave, onCancel }) => {
             title,
             description,
             tags: tags.split(',').map((tag) => tag.trim()),
+            ...sharingSettings
         });
     };
 
@@ -48,6 +54,15 @@ const EditBookmarkForm = ({ bookmark, onSave, onCancel }) => {
                 onChange={(e) => setTags(e.target.value)}
                 className="w-full p-2 border rounded-lg"
             />
+            
+            <div className="mt-4">
+                <ShareSettings
+                    initialVisibility={sharingSettings.visibility}
+                    initialSharedWith={sharingSettings.sharedWith}
+                    onSettingsChange={setSharingSettings}
+                />
+            </div>
+            
             <div className="flex space-x-2">
                 <button type="submit" className="w-full p-2 bg-green-500 text-white rounded-lg">
                     Save

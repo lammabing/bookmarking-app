@@ -14,6 +14,8 @@ const App = () => {
   const [bookmarks, setBookmarks] = useState([]);
   const [filteredBookmarks, setFilteredBookmarks] = useState([]);
   const [viewMode, setViewMode] = useState('grid');
+  const [sharingFilter, setSharingFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [initialFormData, setInitialFormData] = useState(null);
   const [fontSettings, setFontSettings] = useState({
     titleFontFamily: 'Arial',
@@ -45,10 +47,26 @@ const App = () => {
   }, [fontSettings]);
 
   // Fetch bookmarks from the backend only when logged in
+  // Check existing session on load
   useEffect(() => {
-    if (currentUser) {
-      console.log('Fetching bookmarks... currentUser:', currentUser);
-      const fetchBookmarks = async () => {
+    const checkSession = async () => {
+      try {
+        const { data } = await api.get('/users/me');
+        setCurrentUser(data);
+      } catch (err) {
+        // Not logged in
+        setCurrentUser(null);
+      }
+    };
+    
+    checkSession();
+  }, []);
+
+  // Fetch bookmarks when user changes
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (currentUser) {
+        console.log('Fetching bookmarks... currentUser:', currentUser);
         try {
           const { data } = await api.get('/bookmarks');
           console.log('Fetched bookmarks:', data.length);
@@ -61,13 +79,14 @@ const App = () => {
             console.error('Response status:', error.response.status);
           }
         }
-      };
-      fetchBookmarks();
-    } else {
-      // Clear bookmarks when logged out
-      setBookmarks([]);
-      setFilteredBookmarks([]);
-    }
+      } else {
+        // Clear bookmarks when logged out
+        setBookmarks([]);
+        setFilteredBookmarks([]);
+      }
+    };
+    
+    fetchBookmarks();
   }, [currentUser]); // Refetch when currentUser changes
 
   // Handle bookmarklet data
@@ -132,15 +151,42 @@ const App = () => {
   };
 
   // Search bookmarks
-  const handleSearch = (query) => {
-    const filtered = bookmarks.filter(
-      (bookmark) =>
-        bookmark.title.toLowerCase().includes(query.toLowerCase()) ||
-        bookmark.description.toLowerCase().includes(query.toLowerCase()) ||
-        bookmark.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()))
-    );
+  const filterBookmarks = () => {
+    let filtered = bookmarks;
+    
+    // Apply search query
+    if (searchQuery) {
+      filtered = filtered.filter(
+        (bookmark) =>
+          bookmark.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          bookmark.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          bookmark.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+    }
+    
+    // Apply sharing filter
+    if (sharingFilter === 'shared-with-me') {
+      filtered = filtered.filter(bookmark =>
+        bookmark.visibility === 'selected' &&
+        bookmark.sharedWith &&
+        bookmark.sharedWith.some(user => user._id === currentUser?._id)
+      );
+    } else if (sharingFilter === 'public') {
+      filtered = filtered.filter(bookmark => bookmark.visibility === 'public');
+    } else if (sharingFilter === 'private') {
+      filtered = filtered.filter(bookmark =>
+        bookmark.visibility === 'private' &&
+        bookmark.owner?._id === currentUser?._id
+      );
+    }
+    
     setFilteredBookmarks(filtered);
   };
+
+  // Filter bookmarks whenever search query or sharing filter changes
+  useEffect(() => {
+    filterBookmarks();
+  }, [searchQuery, sharingFilter, bookmarks]);
 
   // Toggle view mode
   const toggleViewMode = () => {
@@ -213,9 +259,15 @@ const App = () => {
     setCurrentUser(user);
   };
   
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    try {
+      // Call logout API to clear cookie
+      await api.post('/users/logout');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+    
+    // Clear client-side state
     setCurrentUser(null);
   };
   
@@ -269,6 +321,23 @@ const App = () => {
         >
           {viewMode === 'grid' ? <List size={24} /> : <Grid size={24} />}
         </button>
+
+        {/* Sharing Filter */}
+        <select
+          value={sharingFilter}
+          onChange={(e) => {
+            setSharingFilter(e.target.value);
+            filterBookmarks();
+          }}
+          onMouseEnter={() => setHoverText('Filter by sharing')}
+          onMouseLeave={() => setHoverText('')}
+          className="p-2 border rounded-lg bg-white"
+        >
+          <option value="all">All Bookmarks</option>
+          <option value="shared-with-me">Shared with Me</option>
+          <option value="public">Public</option>
+          <option value="private">My Private</option>
+        </select>
 
         {/* Copy Bookmarks Button */}
         <button
@@ -328,7 +397,13 @@ const App = () => {
           />
         </div>
       </div>
-      <SearchBar onSearch={handleSearch} />
+      <SearchBar
+        onSearch={(query) => {
+          setSearchQuery(query);
+          filterBookmarks();
+        }}
+        placeholder="Search bookmarks..."
+      />
       <FontSettingsModal
         isOpen={isFontSettingsModalOpen}
         onClose={() => setIsFontSettingsModalOpen(false)}

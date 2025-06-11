@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { fetchMetadata } from '../utils/fetchMetadata';
+import ShareSettings from './ShareSettings';
 
 const AddBookmarkForm = ({ onAdd }) => {
     const [url, setUrl] = useState('');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [tags, setTags] = useState('');
+    const [sharingSettings, setSharingSettings] = useState({
+      visibility: 'private',
+      sharedWith: []
+    });
 
     // Extract URL parameters
     useEffect(() => {
@@ -40,6 +45,7 @@ const AddBookmarkForm = ({ onAdd }) => {
             description,
             tags: tags.split(',').map((tag) => tag.trim()),
             favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}`,
+            ...sharingSettings
         });
         setUrl('');
         setTitle('');
@@ -78,7 +84,15 @@ const AddBookmarkForm = ({ onAdd }) => {
                 onChange={(e) => setTags(e.target.value)}
                 className="w-full p-2 border rounded-lg"
             />
-            <button type="submit" className="w-full p-2 bg-blue-500 text-white rounded-lg">
+            <div className="mt-4">
+                <ShareSettings
+                    initialVisibility={sharingSettings.visibility}
+                    initialSharedWith={sharingSettings.sharedWith}
+                    onSettingsChange={setSharingSettings}
+                />
+            </div>
+            
+            <button type="submit" className="mt-4 w-full p-2 bg-blue-500 text-white rounded-lg">
                 Add Bookmark
             </button>
         </form>

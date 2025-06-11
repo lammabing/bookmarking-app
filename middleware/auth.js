@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const auth = async (req, res, next) => {
-  // Get token from header
-  const token = req.header('x-auth-token');
+  // Get token from cookie
+  const token = req.cookies.token;
 
   // Check if no token
   if (!token) {
