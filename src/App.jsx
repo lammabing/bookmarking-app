@@ -44,24 +44,30 @@ const App = () => {
     saveFontSettings(fontSettings);
   }, [fontSettings]);
 
-  // Fetch bookmarks from the backend
+  // Fetch bookmarks from the backend only when logged in
   useEffect(() => {
-    console.log('Fetching bookmarks... currentUser:', currentUser);
-    const fetchBookmarks = async () => {
-      try {
-        const { data } = await api.get('/bookmarks');
-        console.log('Fetched bookmarks:', data.length);
-        setBookmarks(data);
-        setFilteredBookmarks(data);
-      } catch (error) {
-        console.error('Error fetching bookmarks:', error);
-        if (error.response) {
-          console.error('Response data:', error.response.data);
-          console.error('Response status:', error.response.status);
+    if (currentUser) {
+      console.log('Fetching bookmarks... currentUser:', currentUser);
+      const fetchBookmarks = async () => {
+        try {
+          const { data } = await api.get('/bookmarks');
+          console.log('Fetched bookmarks:', data.length);
+          setBookmarks(data);
+          setFilteredBookmarks(data);
+        } catch (error) {
+          console.error('Error fetching bookmarks:', error);
+          if (error.response) {
+            console.error('Response data:', error.response.data);
+            console.error('Response status:', error.response.status);
+          }
         }
-      }
-    };
-    fetchBookmarks();
+      };
+      fetchBookmarks();
+    } else {
+      // Clear bookmarks when logged out
+      setBookmarks([]);
+      setFilteredBookmarks([]);
+    }
   }, [currentUser]); // Refetch when currentUser changes
 
   // Handle bookmarklet data
