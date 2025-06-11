@@ -1,0 +1,3 @@
+OPENAI_LIKE_API_BASE_URL="https://api.hyperbolic.xyz/v1"
+OPENAILike_API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJsYW1tYWJpbmdAcHJvdG9ubWFpbC5jb20iLCJpYXQiOjE3MzU0Mzg3MzV9.hcDLGgvPSNHNjGupxOvXuH3gszR4P84XDY0af2kWtxw",
+MONGODB_URI="mongodb://localhost:27017/bookmarking-app"

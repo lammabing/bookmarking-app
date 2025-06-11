@@ -6,8 +6,9 @@ import FontSettingsModal from './components/FontSettingsModal';
 import TagManager from './components/TagManager'; // Import TagManager
 import { loadFontSettings, saveFontSettings } from './utils/fontSettings';
 import { Settings, Grid, List, Copy, Upload, Bookmark as BookmarkIcon, Tags } from 'lucide-react'; // Import Tags icon
-
-const API_URL = 'http://localhost:5015/api/bookmarks';
+import AuthModal from './components/Auth/AuthModal';
+import { LogIn, LogOut, User } from 'lucide-react';
+import api from './utils/api';
 
 const App = () => {
   const [bookmarks, setBookmarks] = useState([]);
@@ -27,6 +28,8 @@ const App = () => {
   const [isFontSettingsModalOpen, setIsFontSettingsModalOpen] = useState(false);
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false); // State for TagManager visibility
   const [hoverText, setHoverText] = useState('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Load font settings on mount
   useEffect(() => {
@@ -43,18 +46,23 @@ const App = () => {
 
   // Fetch bookmarks from the backend
   useEffect(() => {
+    console.log('Fetching bookmarks... currentUser:', currentUser);
     const fetchBookmarks = async () => {
       try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
+        const { data } = await api.get('/bookmarks');
+        console.log('Fetched bookmarks:', data.length);
         setBookmarks(data);
         setFilteredBookmarks(data);
       } catch (error) {
         console.error('Error fetching bookmarks:', error);
+        if (error.response) {
+          console.error('Response data:', error.response.data);
+          console.error('Response status:', error.response.status);
+        }
       }
     };
     fetchBookmarks();
-  }, []);
+  }, [currentUser]); // Refetch when currentUser changes
 
   // Handle bookmarklet data
   useEffect(() => {
@@ -80,16 +88,9 @@ const App = () => {
   // Add a new bookmark
   const handleAddBookmark = async (bookmark) => {
     try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookmark),
-      });
-      const savedBookmark = await response.json();
-      setBookmarks([...bookmarks, savedBookmark]);
-      setFilteredBookmarks([...bookmarks, savedBookmark]);
+      const { data } = await api.post('/bookmarks', bookmark);
+      setBookmarks([...bookmarks, data]);
+      setFilteredBookmarks([...bookmarks, data]);
       setInitialFormData(null); // Clear initial form data after adding
     } catch (error) {
       console.error('Error adding bookmark:', error);
@@ -98,52 +99,24 @@ const App = () => {
 
   // Edit a bookmark
   const handleEditBookmark = async (updatedBookmark) => {
-    console.log('handleEditBookmark called with:', updatedBookmark);
     try {
-      console.log(`Attempting PUT request to ${API_URL}/${updatedBookmark._id}`);
-      const response = await fetch(`${API_URL}/${updatedBookmark._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedBookmark),
-      });
-      
-      if (!response.ok) {
-        let errorMessage = `HTTP error! status: ${response.status}`;
-        try {
-          // Try to get a more specific message from the server response
-          const errorData = await response.json();
-          if (errorData && errorData.message) {
-            errorMessage = errorData.message;
-          }
-        } catch (e) {
-          // If parsing JSON fails, stick with the original HTTP error
-          console.warn('Could not parse error response as JSON:', e);
-        }
-        throw new Error(errorMessage);
-      }
-
-      const savedBookmark = await response.json();
-      console.log('PUT request successful, received:', savedBookmark);
+      const { data } = await api.put(`/bookmarks/${updatedBookmark._id}`, updatedBookmark);
       
       const updatedBookmarks = bookmarks.map((bookmark) =>
-        bookmark._id === savedBookmark._id ? savedBookmark : bookmark
+        bookmark._id === data._id ? data : bookmark
       );
       setBookmarks(updatedBookmarks);
       setFilteredBookmarks(updatedBookmarks);
     } catch (error) {
-      console.error('Error updating bookmark:', error.message);
-      alert(`Failed to update bookmark: ${error.message}`);
+      console.error('Error updating bookmark:', error);
+      alert(`Failed to update bookmark: ${error.response?.data?.message || error.message}`);
     }
   };
 
   // Delete a bookmark
   const handleDeleteBookmark = async (id) => {
     try {
-      await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE',
-      });
+      await api.delete(`/bookmarks/${id}`);
       const updatedBookmarks = bookmarks.filter((bookmark) => bookmark._id !== id);
       setBookmarks(updatedBookmarks);
       setFilteredBookmarks(updatedBookmarks);
@@ -208,22 +181,14 @@ const App = () => {
         }));
 
         // Add the processed bookmarks to the database
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(processedBookmarks),
-        });
-
-        const savedBookmarks = await response.json();
-        setBookmarks([...bookmarks, ...savedBookmarks]);
-        setFilteredBookmarks([...bookmarks, ...savedBookmarks]);
+        const { data } = await api.post('/bookmarks', processedBookmarks);
+        setBookmarks([...bookmarks, ...data]);
+        setFilteredBookmarks([...bookmarks, ...data]);
 
         alert('Bookmarks imported successfully!');
       } catch (error) {
         console.error('Error importing bookmarks:', error);
-        alert('Failed to import bookmarks. Please check the file format.');
+        alert(`Failed to import bookmarks: ${error.response?.data?.message || error.message}`);
       }
     };
     reader.readAsText(file);
@@ -234,13 +199,49 @@ const App = () => {
     const title = encodeURIComponent(document.title);
     const description = encodeURIComponent(window.getSelection().toString().trim() || '');
     const favicon = encodeURIComponent(document.querySelector('link[rel*="icon"]')?.href || \`https://www.google.com/s2/favicons?domain=\${window.location.hostname}\`);
-    const appUrl = \`http://localhost:5170/add?url=\${url}&title=\${title}&description=\${description}&favicon=\${favicon}\`;
+    const appUrl = \`http://localhost:5173/add?url=\${url}&title=\${title}&description=\${description}&favicon=\${favicon}\`;
     window.open(appUrl, '_blank');
   })();`;
 
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+  };
+  
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setCurrentUser(null);
+  };
+  
+  const authButton = currentUser ? (
+    <div className="flex items-center">
+      <span className="mr-2 text-sm hidden md:inline">
+        {currentUser.username}
+      </span>
+      <button
+        onClick={handleLogout}
+        className="flex items-center text-sm bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded"
+      >
+        <LogOut size={16} className="mr-1" />
+        <span className="hidden md:inline">Logout</span>
+      </button>
+    </div>
+  ) : (
+    <button
+      onClick={() => setIsAuthModalOpen(true)}
+      className="flex items-center text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded"
+    >
+      <LogIn size={16} className="mr-1" />
+      <span className="hidden md:inline">Login / Register</span>
+    </button>
+  );
+
   return (
-    <div className="p-2">
-      <h1 className="text-xl font-bold mb-4">Web Bookmarking App</h1>
+    <div className="container mx-auto px-4 py-8">
+      <header className="flex justify-between items-center mb-8">
+        <h1 className="text-2xl font-bold">Bookmarking App</h1>
+        {authButton}
+      </header>
       <AddBookmarkForm onAdd={handleAddBookmark} initialData={initialFormData} />
       <div className="flex items-center space-x-2 mb-4">
         {/* Appearance Button */}
@@ -339,6 +340,11 @@ const App = () => {
         onEdit={handleEditBookmark}
         viewMode={viewMode}
         fontSettings={fontSettings}
+      />
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuth={handleLogin}
       />
     </div>
   );
